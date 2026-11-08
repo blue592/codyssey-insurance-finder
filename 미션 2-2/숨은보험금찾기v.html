@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>숨은 보험금 찾기</title>
+<style>
+:root{--bg:#E5F1EF;--dark:#355853;--gold:#D6A316;--card:#FFFFFF;--text:#1E3533;--line:#D5E3E0}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+header{background:var(--dark);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{font-size:20px;margin:0}
+#saveState{font-size:13px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:12px}
+main{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}
+@media(max-width:767px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:16px}
+.card h2,h2{font-size:17px;margin:0 0 10px;color:var(--dark)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:767px){.grid3{grid-template-columns:1fr}}
+button{min-height:44px;min-width:44px;border:0;border-radius:10px;padding:8px 14px;background:#eef4f3;color:var(--text);font:inherit;cursor:pointer;margin:2px}
+button.primary{background:var(--gold);color:#1E1A00;font-weight:bold}
+button.danger{background:#f6dcdc;color:#6b1d1d}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+input,select,textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%;margin:2px 0 8px}
+input[type=checkbox]{width:auto;margin:0 4px 0 0}
+label{font-size:13px;display:block}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tags label{display:inline-block;margin-right:10px}
+.muted{color:#5b7470;font-size:13px}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;background:#eef4f3;border:1px solid var(--line)}
+.item{border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.summary{background:var(--dark);color:#fff;border-radius:14px;padding:16px;position:sticky;top:8px;align-self:start;margin-bottom:16px}
+.summary .big{font-size:20px;font-weight:bold}
+.summary .muted{color:#d4e6e2}
+.warn{background:#fff6dc;border-radius:8px;padding:8px;font-size:13px;color:#4a3b00}
+.res{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+details summary{cursor:pointer;color:var(--dark);font-weight:bold;min-height:44px;display:flex;align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>숨은 보험금 찾기</h1>
+  <span id="saveState" aria-live="polite">준비 중</span>
+</header>
+<main>
+  <section class="card" style="grid-column:1/-1">
+    <h2>1. 필수자료 3종 (각 1건 이상 등록해야 검색할 수 있습니다)</h2>
+    <p class="muted" style="margin-top:0">현재 예시: 가상 인물 ‘한예린(가상)’의 자료가 들어 있습니다. 실제 자료로 쓰려면 예시 자료를 삭제한 뒤 등록하세요. 이름·주민등록번호·연락처·전체 증권번호는 입력하지 마세요.</p>
+    <p class="muted" id="counts"></p>
+    <p id="gateMsg" class="warn" hidden></p>
+    <div class="grid3">
+      <div class="card" id="boxTerm"></div>
+      <div class="card" id="boxDoc"></div>
+      <div class="card" id="boxPol"></div>
+    </div>
+  </section>
+
+  <div>
+    <section class="card">
+      <h2>2. 질병명·상해명 또는 진단코드 검색</h2>
+      <div class="row">
+        <input id="q" placeholder="예: 갑상선암, C73, 입원" aria-label="검색어" style="flex:1;min-width:200px">
+        <button id="btnSearch" class="primary">검색</button>
+        <button id="btnReset">검색기록 초기화</button>
+      </div>
+      <div id="tagBox" class="row" style="margin-top:8px"></div>
+      <div id="results" style="margin-top:12px"></div>
+    </section>
+    <section class="card">
+      <h2>3. 검색 기록 · 책갈피</h2>
+      <div id="histBox"></div>
+    </section>
+    <section class="card">
+      <h2>4. 백업 · 불러오기</h2>
+      <p class="muted" id="backupInfo"></p>
+      <div class="row">
+        <button id="btnBackup">백업 파일 내려받기</button>
+        <label style="display:inline-block">불러오기 <input type="file" id="restoreFile" accept=".json,application/json" style="width:auto"></label>
+      </div>
+    </section>
+  </div>
+
+  <aside class="summary">
+    <h2 style="color:#fff">5. 합계</h2>
+    <div id="sum"></div>
+  </aside>
+</main>
+
+<script>
+const TAGS=['질병','상해','운전자','여행','실손'];
+const LABEL={need:'자료 부족',pay:'지급가능 추정',exp:'예상'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const won=n=>n==null?'—':Math.round(n).toLocaleString('ko-KR')+'원';
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const fmt=s=>s?new Date(s).toLocaleString('ko-KR'):'';
+let S,cur=null,idbOK=true;
+
+function seed(){
+  return {
+    docs:[
+      {id:'t1',kind:'약관',insurer:'가상생명보험',product:'가상건강보험 A',tags:['질병'],
+       text:'제5조(암 진단비) 갑상선암(C73) 진단이 확정되면 진단비를 1회 지급합니다.\n제7조(질병입원일당) 질병으로 입원하면 입원일수만큼 1일당 일당을 지급합니다. 1회 지급 한도는 60일입니다.\n제9조(골절 진단비) 골절(S72) 진단 시 1회 지급합니다.'},
+      {id:'d1',kind:'증권',insurer:'가상생명보험',product:'가상건강보험 A',tags:['질병'],
+       text:'계약일 2024-03-01 · 특약: 암진단비, 질병입원일당 (개인정보 제외)'}
+    ],
+    policies:[
+      {id:'p1',insurer:'가상생명보험',product:'가상건강보험 A',rider:'암진단비',keys:'갑상선암,C73,암',amount:10000000,method:'정액',limit:null,status:'유지'},
+      {id:'p2',insurer:'가상생명보험',product:'가상건강보험 A',rider:'질병입원일당',keys:'입원,질병입원',amount:50000,method:'일당',limit:60,status:'유지'}
+    ],
+    history:[],bookmarks:[],checks:{},lastBackup:''
+  };
+}
+
+function dbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open('insurance-finder',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function dbGet(){const db=await dbOpen();return new Promise((res,rej)=>{const q=db.transaction('kv').objectStore('kv').get('state');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});}
+async function dbPut(v){const db=await dbOpen();return new Promise((res,rej)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,'state');t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
+
+function setSt(t){$('saveState').textContent=t;}
+async function save(){
+  if(!idbOK){setSt('임시 사용 중 — 백업 파일을 저장하세요');return;}
+  setSt('저장 중…');
+  try{await dbPut(S);setSt('자동저장 완료');}catch(e){setSt('저장 실패 — 백업을 권장합니다');}
+}
+function changed(){save();render();}
+
+async function init(){
+  try{const v=await dbGet();S=v||seed();if(!v)await dbPut(S);setSt('자동저장 완료');}
+  catch(e){idbOK=false;S=seed();setSt('임시 사용 중 — 백업 파일을 저장하세요');}
+  render();
+}
+
+/* ---------- 상태 계산 ---------- */
+function counts(){return{약관:S.docs.filter(d=>d.kind==='약관').length,증권:S.docs.filter(d=>d.kind==='증권').length,보험정보:S.policies.length};}
+function ready(){return Object.values(counts()).every(n=>n>0);}
+
+function calc(p,c){
+  const a=p.amount;
+  if(p.method==='정액')return{base:a,formula:`${won(a)} × 1회`};
+  if(p.method==='일당'){
+    const d=parseInt(c.days,10);
+    if(!(d>0))return{base:null,formula:'입원일수를 입력하세요'};
+    const n=p.limit?Math.min(d,p.limit):d;
+    return{base:a*n,formula:`${won(a)} × ${n}일${p.limit&&d>p.limit?` (한도 ${p.limit}일 적용)`:''}`};
+  }
+  if(p.method==='회당'){
+    const k=parseInt(c.count,10);
+    if(!(k>0))return{base:null,formula:'지급 횟수를 입력하세요'};
+    const n=p.limit?Math.min(k,p.limit):k;
+    return{base:a*n,formula:`${won(a)} × ${n}회`};
+  }
+  return{base:null,formula:'실손은 자동 계산하지 않음 (직접 확인)'};
+}
+function row(p){
+  const c=S.checks[p.id]||{};
+  const {base,formula}=calc(p,c);
+  const met=c.met||'모름';
+  const bucket=base==null?'need':(met==='예'?'pay':'exp');
+  return{c,base,formula,bucket,met,claim:c.claim||'모름'};
+}
+function search(q,tags){
+  const ql=q.toLowerCase();
+  const terms=S.docs.filter(d=>d.kind==='약관'&&(!tags.length||d.tags.some(t=>tags.includes(t))));
+  const out=[];
+  for(const p of S.policies){
+    const hit=p.keys.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).some(k=>k.includes(ql)||ql.includes(k));
+    if(!hit)continue;
+    let clause=null;
+    for(const t of terms){
+      if(t.product!==p.product)continue;
+      const l=t.text.split('\n').find(x=>x.toLowerCase().includes(ql));
+      if(l){clause=l.trim();break;}
+    }
+    if(clause)out.push({p,clause});
+  }
+  return out;
+}
+
+/* ---------- 렌더링 ---------- */
+function render(){renderCounts();renderBoxes();renderGate();renderResults();renderSummary();renderHist();renderBackup();}
+function renderCounts(){const c=counts();$('counts').textContent=`약관 ${c.약관}건 / 증권 ${c.증권}건 / 보험정보 ${c.보험정보}건`;}
+function renderGate(){
+  const c=counts(),miss=Object.keys(c).filter(k=>!c[k]),ok=!miss.length;
+  $('btnSearch').disabled=!ok;$('q').disabled=!ok;
+  $('gateMsg').hidden=ok;
+  $('gateMsg').textContent=ok?'':`검색하려면 다음 자료를 먼저 1건 이상 등록하세요: ${miss.join(', ')}`;
+}
+const DOC_FORM=`<label>보험회사<input name="insurer"></label><label>상품명 (보험정보의 상품명과 같게)<input name="product"></label>
+<div class="tags">${TAGS.map(t=>`<label><input type="checkbox" name="tags" value="${t}">${t}</label>`).join('')}</div>
+<label>검색용 텍스트 (조항을 한 줄씩 입력)<textarea name="text" rows="4"></textarea></label>
+<button class="primary" data-act="add-doc">저장</button>`;
+const POL_FORM=`<label>보험회사<input name="insurer"></label><label>상품명 (약관 상품명과 같게)<input name="product"></label>
+<label>특약명<input name="rider"></label><label>검색 연결 키워드 (쉼표 구분, 예: 갑상선암,C73)<input name="keys"></label>
+<label>가입금액(원)<input name="amount" type="number" min="0"></label>
+<label>지급 방식<select name="method"><option>정액</option><option>일당</option><option>회당</option><option>실손</option></select></label>
+<label>한도 (일 또는 회, 없으면 비움)<input name="limit" type="number" min="0"></label>
+<label>보험 상태<select name="status"><option>유지</option><option>해지</option><option>만기</option></select></label>
+<button class="primary" data-act="add-pol">저장</button>`;
+function renderBoxes(){
+  const c=counts();
+  const docBox=(kind,id)=>{
+    const items=S.docs.filter(d=>d.kind===kind).map(d=>`<div class="item">${esc(d.insurer)} · ${esc(d.product)} <span class="badge">${esc(d.tags.join(', ')||'태그 없음')}</span><br><button class="danger" data-act="del-doc" data-id="${d.id}">삭제</button></div>`).join('');
+    $(id).innerHTML=`<h2>${kind} ${c[kind]?`(${c[kind]}건)`:'<span class="badge">미등록</span>'}</h2>${items}<details><summary>${kind} 추가</summary><div data-form="doc" data-kind="${kind}">${DOC_FORM}</div></details>`;
+  };
+  docBox('약관','boxTerm');
+  docBox('증권','boxDoc');
+  const pols=S.policies.map(p=>`<div class="item">${esc(p.insurer)} · ${esc(p.product)} / ${esc(p.rider)}<br><span class="muted">${p.method} · ${won(p.amount)}</span><br><button class="danger" data-act="del-pol" data-id="${p.id}">삭제</button></div>`).join('');
+  $('boxPol').innerHTML=`<h2>보험정보 ${c.보험정보?`(${c.보험정보}건)`:'<span class="badge">미등록</span>'}</h2>${pols}<details><summary>보험정보 추가</summary><div data-form="pol">${POL_FORM}</div></details>`;
+}
+function cardHtml(it){
+  const {p,clause}=it,r=row(p),c=r.c;
+  return `<div class="res">
+    <div class="row"><span class="badge">${LABEL[r.bucket]}</span><strong>${esc(p.insurer)} · ${esc(p.product)} / ${esc(p.rider)}</strong></div>
+    <div class="muted">약관 근거: ${esc(clause)}</div>
+    <div>가입금액 ${won(p.amount)} · 지급 방식 ${p.method}${p.limit?` · 한도 ${p.limit}`:''} · 보험 상태 ${p.status}</div>
+    <div>계산: ${esc(r.formula)}${r.base==null?' (금액 산정 불가)':` = <strong>${won(r.base)}</strong>`}</div>
+    <div class="row" style="margin-top:6px">
+      ${p.method==='일당'?`<label>입원일수 <input type="number" min="0" data-id="${p.id}" data-k="days" value="${esc(c.days??'')}" style="width:90px"></label>`:''}
+      ${p.method==='회당'?`<label>지급 횟수 <input type="number" min="0" data-id="${p.id}" data-k="count" value="${esc(c.count??'')}" style="width:90px"></label>`:''}
+      <label>지급 조건 확인 <select data-id="${p.id}" data-k="met">${['모름','예','아니요'].map(v=>`<option${r.met===v?' selected':''}>${v}</option>`).join('')}</select></label>
+      <label>청구 상태 <select data-id="${p.id}" data-k="claim">${['모름','미청구','청구함'].map(v=>`<option${r.claim===v?' selected':''}>${v}</option>`).join('')}</select></label>
+      <button data-act="bm" data-id="${p.id}">책갈피 저장</button>
+    </div>
+  </div>`;
+}
+function renderResults(){
+  const box=$('results');
+  if(!cur){box.innerHTML='<p class="muted">검색하면 관련 보장이 여기에 표시됩니다.</p>';return;}
+  if(!cur.items.length){box.innerHTML=`<p class="muted">‘${esc(cur.q)}’과(와) 연결된 약관 근거와 보험정보를 찾지 못했습니다. 약관 문장이나 보험정보의 검색 키워드를 확인하세요.</p>`;return;}
+  box.innerHTML=`<h2>관련 보장 ${cur.items.length}건 · 검색어 ‘${esc(cur.q)}’</h2>`+cur.items.map(cardHtml).join('');
+}
+function renderSummary(){
+  const has=!!cur;
+  let pay=0,exp=0,notYes=0,upay=0,uexp=0;
+  if(has)for(const {p} of cur.items){
+    const r=row(p);
+    if(r.bucket!=='pay')notYes++;
+    if(r.bucket==='pay'){pay+=r.base;if(r.claim==='미청구')upay+=r.base;}
+    else if(r.bucket==='exp'){exp+=r.base;if(r.claim==='미청구')uexp+=r.base;}
+  }
+  const f=v=>has?won(v):'—';
+  $('sum').innerHTML=`<div class="muted">지급가능 추정액</div><div class="big">${f(pay)}</div>
+    <div class="muted" style="margin-top:8px">예상금액</div><div class="big">${f(exp)}</div>
+    <div class="muted" style="margin-top:8px">추가 확인 ${has?notYes:'—'}건</div>
+    <div class="muted">미청구 지급가능 ${f(upay)} · 미청구 예상 ${f(uexp)}</div>
+    <p class="muted" style="font-size:12px;margin-top:12px">※ 지급가능 추정액은 입력한 약관·증권 조건에 따른 추정치이며 보험사의 확정 지급액이 아닙니다. 미청구 금액은 전체 합계에 중복으로 더하지 않은 별도 표시입니다.</p>`;
+}
+function renderHist(){
+  $('histBox').innerHTML=`<h2>최근 검색</h2>${S.history.length?S.history.map(h=>`<div class="item"><button data-act="h-search" data-q="${esc(h.q)}">‘${esc(h.q)}’ 다시 검색</button> <span class="muted">${fmt(h.at)} · ${h.n}건</span> <button class="danger" data-act="h-del" data-id="${h.id}">삭제</button></div>`).join(''):'<p class="muted">검색 기록이 없습니다.</p>'}
+    <h2 style="margin-top:14px">책갈피</h2>${S.bookmarks.length?S.bookmarks.map(b=>`<div class="item">${esc(b.title)} · ‘${esc(b.q)}’ · ${b.label} ${won(b.amount)} <span class="muted">${fmt(b.at)}</span> <button class="danger" data-act="bm-del" data-id="${b.id}">삭제</button></div>`).join(''):'<p class="muted">저장한 책갈피가 없습니다.</p>'}`;
+}
+function renderBackup(){$('backupInfo').textContent=`마지막 백업: ${S.lastBackup||'없음'} · 백업 파일은 암호화되지 않습니다.`;}
+
+/* ---------- 동작 ---------- */
+function doSearch(){
+  if(!ready())return;
+  const q=$('q').value.trim();
+  if(!q)return alert('질병명 또는 진단코드를 입력하세요.');
+  const tags=[...document.querySelectorAll('.tagf:checked')].map(x=>x.value);
+  const items=search(q,tags);
+  cur={q,items};
+  S.history.unshift({id:uid(),q,tags,at:new Date().toISOString(),n:items.length});
+  S.history=S.history.slice(0,30);
+  changed();
+}
+function addBm(id){
+  if(!cur)return;
+  const it=cur.items.find(x=>x.p.id===id);if(!it)return;
+  const r=row(it.p);
+  S.bookmarks.unshift({id:uid(),q:cur.q,title:`${it.p.product} / ${it.p.rider}`,label:LABEL[r.bucket],amount:r.base,at:new Date().toISOString()});
+  changed();
+}
+function addDoc(c){
+  const g=n=>c.querySelector(`[name="${n}"]`).value.trim();
+  const insurer=g('insurer'),product=g('product'),text=g('text');
+  if(!insurer||!product||!text)return alert('보험회사, 상품명, 검색용 텍스트를 입력하세요.');
+  const tags=[...c.querySelectorAll('[name="tags"]:checked')].map(x=>x.value);
+  S.docs.push({id:uid(),kind:c.dataset.kind,insurer,product,tags,text});
+  changed();
+}
+function addPol(c){
+  const g=n=>c.querySelector(`[name="${n}"]`).value.trim();
+  const insurer=g('insurer'),product=g('product'),rider=g('rider'),keys=g('keys'),amount=+g('amount');
+  if(!insurer||!product||!rider||!keys||!(amount>0))return alert('보험회사, 상품명, 특약명, 검색 키워드, 가입금액을 입력하세요.');
+  const lim=g('limit');
+  S.policies.push({id:uid(),insurer,product,rider,keys,amount,method:g('method'),limit:lim?+lim:null,status:g('status')});
+  changed();
+}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const a=b.dataset.act,id=b.dataset.id;
+  switch(a){
+    case 'add-doc':addDoc(b.closest('[data-form]'));break;
+    case 'add-pol':addPol(b.closest('[data-form]'));break;
+    case 'del-doc':if(confirm('이 약관·증권을 삭제할까요?')){S.docs=S.docs.filter(d=>d.id!==id);cur=null;changed();}break;
+    case 'del-pol':if(confirm('이 보험정보를 삭제할까요?')){S.policies=S.policies.filter(p=>p.id!==id);delete S.checks[id];cur=null;changed();}break;
+    case 'bm':addBm(id);break;
+    case 'bm-del':S.bookmarks=S.bookmarks.filter(x=>x.id!==id);changed();break;
+    case 'h-del':S.history=S.history.filter(x=>x.id!==id);changed();break;
+    case 'h-search':$('q').value=b.dataset.q;doSearch();break;
+  }
+});
+$('results').addEventListener('change',e=>{
+  const el=e.target;if(!el.dataset.id)return;
+  const c=S.checks[el.dataset.id]||{};
+  c[el.dataset.k]=el.value;
+  S.checks[el.dataset.id]=c;
+  save();renderResults();renderSummary();
+});
+$('btnSearch').onclick=doSearch;
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+$('btnReset').onclick=()=>{
+  if(!confirm('검색기록과 책갈피에 저장한 결과, 해당 검색의 체크·메모·계산 상태를 삭제합니다. 약관·증권·보험정보는 유지됩니다. 계속할까요?'))return;
+  S.history=[];S.bookmarks=[];S.checks={};cur=null;changed();
+};
+$('btnBackup').onclick=()=>{
+  if(!confirm('백업 파일에는 보험 정보가 암호화 없이 들어갑니다. 내려받을까요?'))return;
+  const data={version:1,exportedAt:new Date().toISOString(),data:{docs:S.docs,policies:S.policies,history:S.history,bookmarks:S.bookmarks,checks:S.checks}};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download='숨은보험금찾기_백업.json';a.click();
+  S.lastBackup=new Date().toLocaleString('ko-KR');
+  changed();
+};
+$('restoreFile').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  let d=null;
+  try{d=JSON.parse(await f.text()).data;}catch(_){}
+  e.target.value='';
+  if(!d||!Array.isArray(d.docs)||!Array.isArray(d.policies))return alert('올바른 백업 파일이 아닙니다.');
+  const nt=d.docs.filter(x=>x.kind==='약관').length,nd=d.docs.filter(x=>x.kind==='증권').length;
+  if(!confirm(`약관 ${nt}건, 증권 ${nd}건, 보험정보 ${d.policies.length}건을 불러와 현재 자료를 모두 교체합니다. 계속할까요?`))return;
+  Object.assign(S,{docs:d.docs,policies:d.policies,history:d.history||[],bookmarks:d.bookmarks||[],checks:d.checks||{}});
+  cur=null;changed();
+});
+$('tagBox').innerHTML='<span class="muted">태그 필터 (선택한 태그 중 하나라도 해당):</span> '+TAGS.map(t=>`<label style="display:inline-block;margin-right:8px"><input type="checkbox" class="tagf" value="${t}"> ${t}</label>`).join('');
+
+init();
+</script>
+</body>
+</html>
