@@ -23,9 +23,25 @@
 | [숨은보험금찾기v3.html](./숨은보험금찾기v3.html) | 수정 기록 2: 글자 자동 추출 문제 수정 시작 | [v3 제작 및 수정 대화](https://chatgpt.com/share/6af08d57-ce7c-83ec-99ff-c5596f1a676c) |
 | [숨은보험금찾기v3-1.html](./숨은보험금찾기v3-1.html) | PDF 증권·약관을 업로드·검색에 사용할 수 있는 .md 파일로 변환한 기록 | [PDF 증권 → .md 변환 대화](https://chatgpt.com/share/6af246df-8648-83e8-a5fa-4fa34e7bd1ba) · [PDF 약관 → .md 변환 대화](https://chatgpt.com/share/6af246da-6de0-83e8-a223-3220305edab4) |
 
-- 수정 기록 3의 주제는 아직 미정이다.
+- v4 이후의 수정 이력은 아래 표와 대화 링크에 기록했다.
 - v2·v3·v3-1 HTML을 이 폴더에 보관하고, 위 표에 버전별 파일 경로와 대화 내역을 연결했다. 파일명은 한글 정규화(NFC)로 통일했다. 최종 제출 HTML은 별도로 확정한다.
 - `제작검증기록.md`는 기존 수정 내역과 실제 테스트 결과를 찾아 정리한 뒤 별도로 커밋할 예정이다. 대화 링크 등록만으로 테스트 완료를 의미하지 않는다.
+
+## v4 이후 버전별 수정 내용
+
+| 버전 | 수정 내용 |
+| --- | --- |
+| [숨은보험금찾기v4.html](https://chatgpt.com/library?file_id=libfile_723cd3d6e4fc8191908534c2e2c3d587&account_id=personal) | 진단코드 DB 등록 및 검색창 버튼 생성. v4의 가장 마지막 저장본을 반영했다. |
+| [숨은보험금찾기v4-1.html](https://chatgpt.com/library?file_id=libfile_a9b2654868dc8191b5a343747ebc489f&account_id=personal) | 화면 구성 재구성 |
+| [숨은보험금찾기v5.html](https://chatgpt.com/library?file_id=libfile_0a6d5335b70081918a6ab3fb802ea1b2&account_id=personal) | 지급규칙 DB 설정 |
+| [숨은보험금찾기v5_1.html](https://chatgpt.com/library?file_id=libfile_652ddb383220819193001512ee2c4729&account_id=personal) | 파일 변환 링크 연결 |
+
+### 관련 대화 내역
+
+- [진단코드 DB·화면 구성·지급규칙 DB·파일 변환 관련 대화 1](https://chatgpt.com/share/6af2851b-a430-83ec-97ab-35c7f0f2de53)
+- [진단코드 DB·화면 구성·지급규칙 DB·파일 변환 관련 대화 2](https://chatgpt.com/share/6af2977b-b87c-83ee-be40-40dafab15f24)
+
+2026-11-10: 사용자 지정 버전별 변경 내용과 대화 링크를 기록했다. 위 표의 v4 이후 링크는 사용자 계정의 원본 파일 링크다. HTML 4개는 각각 약 39~41MB이며, GitHub 연결의 요청당 16MiB 제한으로 저장소 업로드가 완료되지 않았다. v4는 최신 저장본(버전 8)을 선택했다. HTML 내용은 수정하지 않았다. 기능 재시험은 이번 작업 범위에 포함하지 않았다.
 
 ## v2 대화내역 캡처
 
